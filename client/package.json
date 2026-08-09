@@ -13,6 +13,7 @@
     "@icons-pack/react-simple-icons": "^13.13.0",
     "@tailwindcss/vite": "^4.3.0",
     "lucide-react": "^1.16.0",
+    "node": "^26.5.1",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.15.1"
@@ -35,5 +36,10 @@
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.59.4",
     "vite": "^8.0.13"
-  }
+  },
+  "description": "This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.",
+  "main": "eslint.config.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }

@@ -17,7 +17,7 @@ const Dashboard = () => {
         setStats({
           scheduled: posts.filter((p: any) => p.status === "scheduled").length,
           published: posts.filter((p: any) => p.status === "published").length,
-          connectedAccounts: posts.filter((p: any) => p.status === "connected").length
+          connectedAccounts: accountsRes.data.filter((p: any) => p.status === "connected").length
         })
         setActivities(activityRes.data)
       } catch (error) {
