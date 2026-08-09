@@ -1,8 +1,15 @@
 import { AlertCircleIcon, CheckCircleIcon, PlusIcon, UnplugIcon } from "lucide-react";
 import { PLATFORMS } from "../assets/assets";
 
+interface Account {
+    _id: string;
+    handle: string;
+    platform: string;
+    status: string;
+}
+
 interface AccountListProps {
-    accounts: any[];
+    accounts: Account[];
     onDisconnect: (accountId: string) => Promise<void>
 }
 
@@ -28,12 +35,12 @@ const AccountList = ({ accounts, onDisconnect }: AccountListProps) => {
 
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {accounts.map((account, index) => {
+            {accounts.map((account) => {
                 const meta = PLATFORMS.find((p) => p.id === account.platform);
 
                 if (!meta) return null;
                 return (
-                    <div key={index} className="group bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4 hover:border-slate-300 transition-all">
+                    <div key={account._id} className="group bg-white border border-slate-200 rounded-2xl p-5 flex items-center gap-4 hover:border-slate-300 transition-all">
                         <div className="size-12 bg-slate-50 rounded-xl flex items-center justify-center shrink-0">
                             <meta.icon className="size-6 text-slate-500" />
                         </div>

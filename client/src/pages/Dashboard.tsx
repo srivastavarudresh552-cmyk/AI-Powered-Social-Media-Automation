@@ -1,25 +1,36 @@
 import { ActivityIcon, CheckCircleIcon, ClockIcon, SendIcon, Share2Icon, TrendingUpIcon } from 'lucide-react'
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { dummyAccountsData, dummyActivityData, dummyPostsData } from '../assets/assets'
+
+interface Activity {
+  _id: string;
+  createdAt: string;
+  description: string;
+}
+
+interface DashboardPost {
+  status: string;
+}
 
 const Dashboard = () => {
 
   const [stats, setStats] = useState({ scheduled: 0, published: 0, connectedAccounts: 0 })
 
-  const [activities, setActivities] = useState<any[]>([])
+  const [activities, setActivities] = useState<Activity[]>([])
 //  1:15:00
   useEffect(() => {
-    {/*Run After every render */ }
     const fetchDashboardData = async () => {
       try {
-        const [postsRes, accountsRes, activityRes] = [{data: dummyPostsData},{data: dummyAccountsData},{data: dummyActivityData}]
-        const posts = postsRes.data;
+        const [postsRes, accountsRes, activityRes] = [{ data: dummyPostsData }, { data: dummyAccountsData }, { data: dummyActivityData }]
+        const posts = postsRes.data as DashboardPost[]
+        const accounts = accountsRes.data as { status: string }[]
+
         setStats({
-          scheduled: posts.filter((p: any) => p.status === "scheduled").length,
-          published: posts.filter((p: any) => p.status === "published").length,
-          connectedAccounts: accountsRes.data.filter((p: any) => p.status === "connected").length
+          scheduled: posts.filter((p) => p.status === "scheduled").length,
+          published: posts.filter((p) => p.status === "published").length,
+          connectedAccounts: accounts.filter((p) => p.status === "connected").length,
         })
-        setActivities(activityRes.data)
+        setActivities(activityRes.data as Activity[])
       } catch (error) {
         console.error("Error fetching Dashboard data", error)
       }
