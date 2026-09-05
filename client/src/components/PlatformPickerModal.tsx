@@ -1,4 +1,4 @@
-import { XIcon } from "lucide-react";
+import { CheckCircleIcon, ExternalLinkIcon, XIcon } from "lucide-react";
 import { PLATFORMS } from "../assets/assets";
 
 interface PlatformPickerModalProps {
@@ -31,11 +31,11 @@ const PlatformPickerModal = ({ connectedIds, connecting, onClose, onConnect }: P
               <button
                 key={platform.id}
                 type="button"
+                disabled={isConnected || isConnecting}
                 onClick={() => onConnect(platform.id)}
-                disabled={isConnected}
-                className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 px-4 py-3 text-left hover:border-slate-300 transition-all disabled:cursor-not-allowed disabled:opacity-60"
+                className={`flex items-center gap-3 p-3.5 rounded-x1 border text-left transition-all ${isConnected ? "border-red-200 bg-red-50 cursor-default" : "border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-slate-100 curser-pointer"} ${isConnecting && "opacity:60"}`}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-1">
                   <div className="p-2 bg-slate-100 rounded-2xl">
                     <Icon className={`size-5 ${isConnected ? 'text-red-600' : 'text-slate-700'}`} />
                   </div>
@@ -44,11 +44,13 @@ const PlatformPickerModal = ({ connectedIds, connecting, onClose, onConnect }: P
                     <div className="text-sm text-slate-500">{platform.description}</div>
                   </div>
                 </div>
-                <span className="text-sm text-slate-500">
-                  {isConnected ? 'Connected' : isConnecting ? 'Connecting...' : 'Connect'}
-                </span>
+
+                {/* status */}
+                {isConnected && <CheckCircleIcon className="size-4 text-red-500 shrink-0"/>}
+                {isConnecting && <div className="size-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin shrink-0"/>}
+                {!isConnected && !isConnecting && <ExternalLinkIcon className="size-3.5 text-slate-400 shrink-0"/>}
               </button>
-              /**1 : 45 : 00 */
+              /**1 : 53 : 00 */
             )
           })}
         </div>

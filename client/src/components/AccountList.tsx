@@ -44,7 +44,7 @@ const AccountList = ({ accounts, onDisconnect }: AccountListProps) => {
                         <div className="size-12 bg-slate-50 rounded-xl flex items-center justify-center shrink-0">
                             <meta.icon className="size-6 text-slate-500" />
                         </div>
-                        <div>
+                        <div className="flex-1 min-w-0">
                             <div className="text-slate-900 truncate">{account.handle}</div>
                             <div className="text-sm text-slate-500 mt-0.5">{meta.name}</div>
                         </div>

@@ -57,6 +57,8 @@ const Accounts = () => {
           <PlusIcon className="size-4" /> Connect Account
         </button>
       </div>
+      
+      {/* Platform Picker model */}
 
       {showPlatformPicker && (
         <PlatformPickerModal
@@ -66,6 +68,7 @@ const Accounts = () => {
           onConnect={handleConnect}
         />
       )}
+
 
       {/* Connected Accounts List */}
       <AccountList accounts={accounts} onDisconnect={handleDisconnect} />
