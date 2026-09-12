@@ -1,5 +1,11 @@
 import mongoose from "mongoose";
 
+/**
+ * Connects Mongoose using `MONGODB_URI`.
+ *
+ * Terminates the process with exit code 1 if the connection cannot be
+ * established.
+ */
 const connectDB = async () => {
     try {
         mongoose.connection.on("connected", async () => {
