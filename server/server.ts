@@ -18,7 +18,10 @@ app.get('/', (_req: Request, res: Response) => {
     res.send('Server is Live!');
 });
 
-// Global error handler
+/**
+ * Sends a 500 response for errors from preceding middleware, preferring a
+ * nested response message over the error's own message.
+ */
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     console.error(err)
     res.status(500).send(err?.response?.data?.message || err?.message)
