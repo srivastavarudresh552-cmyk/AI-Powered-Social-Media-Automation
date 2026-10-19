@@ -1,25 +1,40 @@
 import { MenuIcon } from 'lucide-react'
 import Sidebar from './Sidebar'
 import { useState } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { useAuth } from '../context/authContext'
 
 const pageTitles: Record<string, string> = {   // Record <keyType , valueType>
-  "/dashboard" : "Dashboard",
-  "/accounts" : "Social Accounts",
-  "/schedule" : "Post Scheduler",
-  "/ai-composer" : "AI Composer",
+  "/dashboard": "Dashboard",
+  "/accounts": "Social Accounts",
+  "/schedule": "Post Scheduler",
+  "/ai-composer": "AI Composer",
 }
 
 
 
 const Layout = () => {
 
+  const { isAuthenticated, isLoading } = useAuth()
+
   const location = useLocation()  // detects the location of the URL
-  
+
 
   const title = pageTitles[location.pathname] || "SocialAI";
 
-  const [isMobileMenuOpen, setisMobileMenuOpen] = useState(false)   
+  const [isMobileMenuOpen, setisMobileMenuOpen] = useState(false)
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <div className='size-8 border-4 border-red-500 border-t-transparent rounded-full animate-spin' />      
+      </div>
+    )
+  }
+
+   if (!isAuthenticated) {
+      return <Navigate to="/login" replace />;
+    }
 
   return (
     <div className='flex h-screen bg-slate-50'>
