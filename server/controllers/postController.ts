@@ -2,9 +2,26 @@ import { Response } from "express";
 import { AuthRequest } from "../middleware/authMiddleware.js";
 import { GoogleGenAI } from "@google/genai";
 import axios from "axios";
+import { createReadStream } from "node:fs";
+import { unlink } from "node:fs/promises";
+import zernio from "../config/zernio.js";
 import Generation from "../models/Generation.js";
 import Post from "../models/Post.js";
 
+const supportedMediaTypes = [
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+    "video/mp4",
+    "video/mpeg",
+    "video/quicktime",
+    "video/avi",
+    "video/x-msvideo",
+    "video/webm",
+    "video/x-m4v",
+] as const;
 
 
 
@@ -12,7 +29,12 @@ import Post from "../models/Post.js";
 // POST /api/posts/generate
 export const generatePost = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-        const { prompt, tone, generateImage } = req.body;
+        const { prompt, tone } = req.body;
+        if (typeof prompt !== "string" || !prompt.trim()) {
+            res.status(400).json({ message: "Please provide a prompt to generate a post." });
+            return;
+        }
+
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
             res.status(400).json({ message: "Gemini API Key is missing. Please add it to your server/.env file." })
@@ -23,27 +45,28 @@ export const generatePost = async (req: AuthRequest, res: Response): Promise<voi
 
         // Generate Text
         const textResponse = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: `Generate a social media post based on this prompt: "${prompt}".
+            model: "gemini-3.8-flash",
+            config: { responseMimeType: "application/json" },
+            contents: `Generate a social media post based on this prompt: "${prompt.trim()}".
 Style: ${tone}.
 Include relevant hashtags.
-Format the response as JSON with "content" and "imagePrompt" fields.
-The "imagePrompt" should be a highly descriptive prompt for an image generator
-that complements the post.`,
+Return a JSON object with a single "content" field containing the complete post.`,
         });
 
-        let content = "";
-        let imagePrompt = prompt;
-
-        try {
-            const rawText = textResponse.text || "";
-            const jsonMatch = rawText.match(/\{\{[\s\S]*\}\}/)
-            const data = jsonMatch ? JSON.parse(jsonMatch[0]) : { content: rawText, imagePrompt: prompt };
-            content = data.content;
-            imagePrompt = data.imagePrompt;
-        } catch (e) {
-            content = textResponse.text || "";
+        const rawText = textResponse.text?.trim();
+        if (!rawText) {
+            throw new Error("Gemini returned an empty response.");
         }
+
+        const jsonText = rawText
+            .replace(/^```(?:json)?\s*/i, "")
+            .replace(/\s*```$/, "")
+            .trim();
+        const result = JSON.parse(jsonText) as { content?: unknown };
+        if (typeof result.content !== "string" || !result.content.trim()) {
+            throw new Error("Gemini returned a response without post content.");
+        }
+        const content = result.content.trim();
 
         // let mediaURL = "";
         // 5:40:00 -- for image
@@ -120,36 +143,45 @@ export const schedulePosts = async (req: AuthRequest, res: Response): Promise<vo
         }
 
 
-        // let mediaUrl: string | undefined = req.body.mediaUrl;
-        // let mediaType: "image" | "video" | undefined = req.body.mediaType;
+        let mediaURL: string | undefined;
+        let mediaType: "image" | "video" | undefined;
 
-        // Upload media only if a file is provided.
-        // if (req.file) {
-        //     const result = await new Promise<any>((resolve, reject) => {
-        //         const stream = cloudinary.uploader.upload_stream(
-        //             {
-        //                 resource_type: "auto",
-        //                 folder: "social-scheduler",
-        //             },
-        //             (error, result) => {
-        //                 if (error) reject(error);
-        //                 else resolve(result);
-        //             }
-        //         );
+        if (req.file) {
+            const contentType = supportedMediaTypes.find((type) => type === req.file!.mimetype);
+            if (!contentType) {
+                res.status(400).json({ message: "Unsupported image or video format" });
+                return;
+            }
 
-        //         stream.end(req.file!.buffer);
-        //     });
+            const { data: upload } = await zernio.media.getMediaPresignedUrl({
+                body: {
+                    filename: req.file.originalname,
+                    contentType,
+                    size: req.file.size,
+                },
+            });
+            if (!upload.uploadUrl || !upload.publicUrl) {
+                throw new Error("Zernio did not return media upload URLs");
+            }
 
-        //     mediaUrl = result.secure_url;
-        //     mediaType = result.resource_type === "video" ? "video" : "image";
-        // }
+            await axios.put(upload.uploadUrl, createReadStream(req.file.path), {
+                headers: {
+                    "Content-Type": contentType,
+                    "Content-Length": req.file.size,
+                },
+                maxBodyLength: Infinity,
+                maxContentLength: Infinity,
+            });
+
+            mediaURL = upload.publicUrl;
+            mediaType = contentType.startsWith("video/") ? "video" : "image";
+        }
 
         const post = await Post.create({
             user: req.user._id,
             content,
             platforms: parsedPlatform,
-            // ...(mediaUrl ? { mediaUrl } : {}),
-            // ...(mediaType ? { mediaType } : {}),
+            ...(mediaURL ? { mediaURL, mediaType } : {}),
             scheduledFor,
             status,
         })
@@ -158,5 +190,13 @@ export const schedulePosts = async (req: AuthRequest, res: Response): Promise<vo
 
     } catch (error: any) {
         res.status(500).json({ message: error?.message || "Server Error" });
+    } finally {
+        if (req.file) {
+            try {
+                await unlink(req.file.path);
+            } catch (error) {
+                console.error("Failed to remove temporary media upload", error);
+            }
+        }
     }
 }

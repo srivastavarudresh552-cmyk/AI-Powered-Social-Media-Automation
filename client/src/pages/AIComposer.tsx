@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react"
 import { dummyGenerationData, PLATFORMS } from "../assets/assets";
 import { ArrowRightIcon, CalendarIcon, ClockIcon, HistoryIcon, Loader2Icon, TimerIcon, Wand2Icon, XIcon } from "lucide-react";
+import API from "../api/axios";
+import toast from "react-hot-toast";
 
 const AIComposer = () => {
 
   const [prompt, setPrompt] = useState("");
   const [tone, setTone] = useState("Professional");
-  const [generateImage, setGenerateImage] = useState(true);
   const [loading, setLoading] = useState(false);
   const [generations, setGenerations] = useState<any[]>([]);
 
@@ -18,7 +19,12 @@ const AIComposer = () => {
   const [scheduling, setScheduling] = useState(false);
 
   const fetchGenerations = async () => {
-    setGenerations(dummyGenerationData)
+    try {
+      const { data } = await API.get('/api/posts/generations');
+      setGenerations(data);
+    } catch (error: any) {
+      toast.error('Failed to fetch generations');
+    }
   };
 
   useEffect(() => {
@@ -26,17 +32,50 @@ const AIComposer = () => {
   }, [])
 
   const handleGenerate = async () => {
-    setLoading(true)
-    setTimeout(() => {
+    if (!prompt) {
+      toast.error('Please enter a prompt');
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data } = await API.post('/api/posts/generate', { prompt, tone });
+      setGenerations([data, ...generations]);
+      setActiveScheduler(data);
+      toast.success('Content generated');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || error.message || 'Generation failed');
+    } finally {
       setLoading(false);
-    }, 2000)
+    }
   }
 
   const handleSchedule = async () => {
-    setScheduling(true)
-    setTimeout(() => {
-      setScheduling(false)
-    }, 2000)
+    if (!activeScheduler)
+      return;
+    if (selectedPlatforms.length === 0) {
+      toast.error('Select at least one platform');
+      return;
+    }
+    if (!scheduledDate || !scheduledTime) {
+      toast.error('Select date and time');
+      return;
+    }
+    const scheduledFor = new Date(`${scheduledDate}T${scheduledTime}`).toISOString();
+    setScheduling(true);
+    try {
+      await API.post('/api/posts', { content: activeScheduler.content, mediaUrl: activeScheduler.mediaUrl, mediaType: activeScheduler.mediaType, platforms: selectedPlatforms, scheduledFor, status: 'scheduled' });
+      toast.success('AI Post Scheduled');
+      setActiveScheduler(null);
+      setSelectedPlatforms([]);
+      setScheduledDate('');
+      setScheduledTime('');
+    }
+    catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to schedule AI post');
+    }
+    finally {
+      setScheduling(false);
+    }
   }
 
   const tones = ["Professional", "Creative", "Funny", "Minimalist", "Excited"];
@@ -57,17 +96,6 @@ const AIComposer = () => {
             onChange={(e) => setPrompt(e.target.value)}
           />
           <div className="absolute bottom-4 right-2.5 flex items-center gap-3 text-sm">
-            <button onClick={() => setGenerateImage(!generateImage)} className="flex
-              items-center gap-2 bg-red-50 py-2 px-3 rounded-lg">
-              <span>AI Image</span>
-              <div className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer
-rounded-full transition-colors duration-200 ease-in-out focus:outline-none 
-${generateImage ? "bg-red-500" : "bg-slate-200"}`}>
-                <span className={`pointer-events-none size-4 transform translate-y-0.5
-rounded-full bg-white shadow transition ${generateImage ? "translate-x-4.5" :
-                    "translate-x-0.5"}`} />
-              </div>
-            </button>
             <button onClick={handleGenerate} disabled={loading} className="bg-slate-900
 hover:bg-slate-800 text-white flex items-center gap-2 px-4 py-2 rounded-lg">
               {loading ? (
@@ -84,9 +112,10 @@ hover:bg-slate-800 text-white flex items-center gap-2 px-4 py-2 rounded-lg">
             </button>
           </div>
         </div>
+        <p className="text-xs text-slate-400">AI image generation is not configured yet; generated posts contain text only.</p>
         <div className="flex flex-wrap justify-center gap-2">
           {tones.map((t) => (
-            <button key={t} onClick={() => setTone(t)} className={`px-4 py-1.5 rounded-full text-sm transition-all border ${tone === t ? "bg-red-500 border-red-500 text-white" : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"}`}>
+            <button key={t} onClick={() => setTone(t)} className={`px - 4 py - 1.5 rounded - full text - sm transition - all border ${tone === t ? "bg-red-500 border-red-500 text-white" : "bg-white border-slate-200 text-slate-500 hover:border-slate-300"}`}>
               {t}
             </button>
           ))}
@@ -191,7 +220,7 @@ hover:bg-slate-800 text-white flex items-center gap-2 px-4 py-2 rounded-lg">
                           onClick={() => setSelectedPlatforms((prev) =>
                             prev.includes(p.id) ? prev.filter((x) => x !== p.id) : [...prev, p.id]
                           )}
-                          className={`p-2.5 rounded-md border text-xs ${active ? "bg-red-500/80 text-white border-red-500" : "bg-white border-slate-200 text-slate-400 hover:border-slate-300"}`}
+                          className={`p - 2.5 rounded - md border text - xs ${active ? "bg-red-500/80 text-white border-red-500" : "bg-white border-slate-200 text-slate-400 hover:border-slate-300"} `}
                         >
                           <p.icon className="size-4.5" />
                         </button>

@@ -1,6 +1,6 @@
 import { ActivityIcon, CheckCircleIcon, ClockIcon, SendIcon, Share2Icon, TrendingUpIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { dummyAccountsData, dummyActivityData, dummyPostsData } from '../assets/assets'
+import API from '../api/axios';
 
 interface Activity {
   _id: string;
@@ -8,26 +8,23 @@ interface Activity {
   description: string;
 }
 
-interface DashboardPost {
-  status: string;
-}
 
 const Dashboard = () => {
 
   const [stats, setStats] = useState({ scheduled: 0, published: 0, connectedAccounts: 0 })
 
   const [activities, setActivities] = useState<Activity[]>([])
-//  1:15:00
+  //  1:15:00
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [postsRes, accountsRes, activityRes] = [{ data: dummyPostsData }, { data: dummyAccountsData }, { data: dummyActivityData }]
-        const posts = postsRes.data as DashboardPost[]
+        const [postsRes, accountsRes, activityRes] = await Promise.all([API.get("/api/posts"), API.get('/api/accounts'), API.get('/api/activity')]);
+        const posts = postsRes.data
         const accounts = accountsRes.data as { status: string }[]
 
         setStats({
-          scheduled: posts.filter((p) => p.status === "scheduled").length,
-          published: posts.filter((p) => p.status === "published").length,
+          scheduled: posts.filter((p: any) => p.status === "scheduled").length,
+          published: posts.filter((p: any) => p.status === "published").length,
           connectedAccounts: accounts.filter((p) => p.status === "connected").length,
         })
         setActivities(activityRes.data as Activity[])
@@ -36,7 +33,7 @@ const Dashboard = () => {
       }
     };
     fetchDashboardData();
-  },[])
+  }, [])
 
   const statCards = [
     {

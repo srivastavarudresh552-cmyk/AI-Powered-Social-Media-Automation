@@ -28,27 +28,27 @@ export const initScheduler = () => {
           }
 
           const zernioPlatforms = accounts.map((acc) => ({
-            tform: acc.platform as any,
+            platform: acc.platform,
             accountId: acc.zernioAccountId!
           }));
 
           const payload = {
             content: post.content,
             publishNow: true,
-            // ...(post.mediaUrl
-            //   ? {
-            //       mediaItems: [
-            //         {
-            //           type: post.mediaType || 'image',
-            //           url: post.mediaUrl
-            //         }
-            //       ]
-            //     }
-            //   : {}),
+            ...(post.mediaURL
+              ? {
+                  mediaItems: [
+                    {
+                      type: post.mediaType === "video" ? "video" as const : "image" as const,
+                      url: post.mediaURL
+                    }
+                  ]
+                }
+              : {}),
             platforms: zernioPlatforms,
           };
 
-          console.log(`Publishing post ${post._id} to Zernio with media ${/*post.mediaUrl ||*/ 'none'}`);
+          console.log(`Publishing post ${post._id} to Zernio with media ${post.mediaURL || 'none'}`);
           const response = await zernio.posts.createPost({ body: payload });
           const publishedPost = (response.data as any)?.post || response.data;
 
