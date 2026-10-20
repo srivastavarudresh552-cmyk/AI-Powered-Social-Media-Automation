@@ -63,7 +63,7 @@ export const initScheduler = () => {
           await ActivityLog.create({
             user: post.user,
             actionType: 'POST_PUBLISHED',
-            description: 'Published post to ${accounts.map((a) => a.platform).join(", ")}',
+            description: `Published post to ${accounts.map((a) => a.platform).join(", ")}`,
             relatedPost: post._id
           });
         } catch (error: any) {
@@ -81,5 +81,5 @@ export const initScheduler = () => {
     }
   });
 
-  console.log('scheduleuler service initialized');
+  console.log('schedululer service initialized');
 };

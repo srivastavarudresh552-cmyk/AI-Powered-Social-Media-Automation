@@ -1,12 +1,13 @@
 import { Response } from "express";
 import { AuthRequest } from "../middleware/authMiddleware.js";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import axios from "axios";
 import { createReadStream } from "node:fs";
 import { unlink } from "node:fs/promises";
 import zernio from "../config/zernio.js";
 import Generation from "../models/Generation.js";
 import Post from "../models/Post.js";
+import { Account } from "../models/Accounts.js";
 
 const supportedMediaTypes = [
     "image/jpeg",
@@ -43,17 +44,27 @@ export const generatePost = async (req: AuthRequest, res: Response): Promise<voi
 
         const ai = new GoogleGenAI({ apiKey });
 
-        // Generate Text
-        const textResponse = await ai.models.generateContent({
-            model: "gemini-3.8-flash",
-            config: { responseMimeType: "application/json" },
-            contents: `Generate a social media post based on this prompt: "${prompt.trim()}".
-Style: ${tone}.
-Include relevant hashtags.
-Return a JSON object with a single "content" field containing the complete post.`,
-        });
+        const interaction = await ai.interactions.create({
+            model: "gemini-3.1-flash-lite",
+            input: `Write a concise social media post for this idea: "${prompt.trim()}".
+Tone: ${tone}. Include relevant hashtags. Return JSON with one string field, "content".`,
+            response_format: {
+                type: "text",
+                mime_type: "application/json",
+                schema: {
+                    type: "object",
+                    properties: { content: { type: "string" } },
+                    required: ["content"],
+                    additionalProperties: false,
+                },
+            },
+            generation_config: {
+                max_output_tokens: 256,
+                thinking_level: ThinkingLevel.LOW.toLowerCase() as Lowercase<ThinkingLevel>,
+            },
+        }, { timeout: 12_000, maxRetries: 0 });
 
-        const rawText = textResponse.text?.trim();
+        const rawText = interaction.output_text?.trim();
         if (!rawText) {
             throw new Error("Gemini returned an empty response.");
         }
@@ -96,6 +107,24 @@ Return a JSON object with a single "content" field containing the complete post.
         res.json(generation);
 
     } catch (error: any) {
+        if (
+            error?.status === 503 ||
+            error?.code === "UNAVAILABLE" ||
+            (error instanceof Error && /high demand|temporarily unavailable|overloaded/i.test(error.message))
+        ) {
+            res.status(503).json({
+                message: "Gemini is temporarily overloaded. Please wait a little and try generating again.",
+            });
+            return;
+        }
+        if (
+            error?.status === 504 ||
+            error?.code === "DEADLINE_EXCEEDED" ||
+            (error instanceof Error && /timeout|deadline exceeded|deadline expired/i.test(error.message))
+        ) {
+            res.status(504).json({ message: "Gemini took too long to generate this post. Please try again." });
+            return;
+        }
         res.status(500).json({ message: error?.message || "Server error" });
     }
 
@@ -142,6 +171,28 @@ export const schedulePosts = async (req: AuthRequest, res: Response): Promise<vo
             }
         }
 
+        if (!Array.isArray(parsedPlatform) || parsedPlatform.length === 0) {
+            res.status(400).json({ message: "Select at least one platform." });
+            return;
+        }
+
+        const connectedAccounts = await Account.find({
+            user: req.user._id,
+            platform: { $in: parsedPlatform },
+            status: "connected",
+            zernioAccountId: { $exists: true, $ne: "" },
+        }).select("platform");
+        const connectedPlatforms = new Set<string>(connectedAccounts.map((account) => account.platform));
+        const unconnectedPlatforms = parsedPlatform.filter((platform: unknown): platform is string =>
+            typeof platform === "string" && !connectedPlatforms.has(platform)
+        );
+
+        if (unconnectedPlatforms.length > 0) {
+            res.status(400).json({
+                message: `Your account${unconnectedPlatforms.length > 1 ? "s are" : " is"} not connected: ${unconnectedPlatforms.join(", ")}. Connect ${unconnectedPlatforms.length > 1 ? "them" : "it"} before scheduling.`,
+            });
+            return;
+        }
 
         let mediaURL: string | undefined;
         let mediaType: "image" | "video" | undefined;

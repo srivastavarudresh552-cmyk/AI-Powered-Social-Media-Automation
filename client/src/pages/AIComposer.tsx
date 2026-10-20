@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { dummyGenerationData, PLATFORMS } from "../assets/assets";
+import { PLATFORMS } from "../assets/assets";
 import { ArrowRightIcon, CalendarIcon, ClockIcon, HistoryIcon, Loader2Icon, TimerIcon, Wand2Icon, XIcon } from "lucide-react";
 import API from "../api/axios";
 import toast from "react-hot-toast";
@@ -10,6 +10,7 @@ const AIComposer = () => {
   const [tone, setTone] = useState("Professional");
   const [loading, setLoading] = useState(false);
   const [generations, setGenerations] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<{ platform: string; status: string }[]>([]);
 
   // Scheduling state
   const [activeScheduler, setActiveScheduler] = useState<any>(null);
@@ -27,9 +28,23 @@ const AIComposer = () => {
     }
   };
 
+  const fetchAccounts = async () => {
+    try {
+      const { data } = await API.get('/api/accounts');
+      setAccounts(data);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to load connected accounts');
+    }
+  };
+
   useEffect(() => {
     fetchGenerations()
+    fetchAccounts()
   }, [])
+
+  const unconnectedPlatforms = selectedPlatforms.filter(
+    (platform) => !accounts.some((account) => account.platform === platform && account.status === "connected")
+  );
 
   const handleGenerate = async () => {
     if (!prompt) {
@@ -38,12 +53,15 @@ const AIComposer = () => {
     }
     setLoading(true);
     try {
-      const { data } = await API.post('/api/posts/generate', { prompt, tone });
+      const { data } = await API.post('/api/posts/generate', { prompt, tone }, { timeout: 15_000 });
       setGenerations([data, ...generations]);
       setActiveScheduler(data);
       toast.success('Content generated');
     } catch (error: any) {
-      toast.error(error.response?.data?.message || error.message || 'Generation failed');
+      const message = error.code === 'ECONNABORTED'
+        ? 'Post generation timed out. Please try again.'
+        : error.response?.data?.message || error.message || 'Generation failed';
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -54,6 +72,13 @@ const AIComposer = () => {
       return;
     if (selectedPlatforms.length === 0) {
       toast.error('Select at least one platform');
+      return;
+    }
+    if (unconnectedPlatforms.length > 0) {
+      const names = unconnectedPlatforms
+        .map((platform) => PLATFORMS.find((item) => item.id === platform)?.name ?? platform)
+        .join(', ');
+      toast.error(`Your account${unconnectedPlatforms.length > 1 ? 's are' : ' is'} not connected: ${names}. Connect ${unconnectedPlatforms.length > 1 ? 'them' : 'it'} before scheduling.`);
       return;
     }
     if (!scheduledDate || !scheduledTime) {
@@ -227,6 +252,15 @@ hover:bg-slate-800 text-white flex items-center gap-2 px-4 py-2 rounded-lg">
                       );
                     })}
                   </div>
+                  {unconnectedPlatforms.length > 0 && (
+                    <p role="alert" className="mt-2 text-sm text-red-600">
+                      Your account{unconnectedPlatforms.length > 1 ? 's are' : ' is'} not connected for{' '}
+                      {unconnectedPlatforms
+                        .map((platform) => PLATFORMS.find((item) => item.id === platform)?.name ?? platform)
+                        .join(', ')}.
+                      Connect {unconnectedPlatforms.length > 1 ? 'these accounts' : 'this account'} before scheduling.
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
