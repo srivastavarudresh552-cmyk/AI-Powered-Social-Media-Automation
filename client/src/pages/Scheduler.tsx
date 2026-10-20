@@ -7,6 +7,7 @@ import API from "../api/axios";
 const Scheduler = () => {
 
   const [posts, setPosts] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<{ platform: string; status: string }[]>([]);
   const [content, setContent] = useState("");
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
@@ -23,14 +24,31 @@ const Scheduler = () => {
     }
   };
 
+  const fetchAccounts = async () => {
+    try {
+      const { data } = await API.get('/api/accounts');
+      setAccounts(data);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to load connected accounts');
+    }
+  };
+
   useEffect(() => {
     (async () => await fetchPosts())();
+    (async () => await fetchAccounts())();
     const interval = setInterval(async () => await fetchPosts(), 10000);
     return () => clearInterval(interval)
   }, [])
 
-  const scheduled = posts.filter((p) => p.status === "scheduled")
-  const published = posts.filter((p) => p.status === "published")
+  const scheduled = posts
+    .filter((p) => p.status === "scheduled")
+    .sort((a, b) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime());
+  const published = posts
+    .filter((p) => p.status === "published")
+    .sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime());
+  const unconnectedPlatforms = selectedPlatforms.filter(
+    (platform) => !accounts.some((account) => account.platform === platform && account.status === "connected")
+  );
 
   const togglePlatform = (id: string) => setSelectedPlatforms((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]))
 
@@ -39,7 +57,15 @@ const Scheduler = () => {
     if (selectedPlatforms.length === 0) {
       toast.error('Select at least one platform');
       return;
-    } if (!scheduledDate || !scheduledTime) {
+    }
+    if (unconnectedPlatforms.length > 0) {
+      const names = unconnectedPlatforms
+        .map((platform) => PLATFORMS.find((item) => item.id === platform)?.name ?? platform)
+        .join(', ');
+      toast.error(`Your account${unconnectedPlatforms.length > 1 ? 's are' : ' is'} not connected: ${names}. Connect ${unconnectedPlatforms.length > 1 ? 'them' : 'it'} before scheduling.`);
+      return;
+    }
+    if (!scheduledDate || !scheduledTime) {
       toast.error('Select date and time');
       return;
     }
@@ -99,6 +125,15 @@ return (
                 );
               })}
             </div>
+            {unconnectedPlatforms.length > 0 && (
+              <p role="alert" className="mt-2 text-sm text-red-600">
+                Your account{unconnectedPlatforms.length > 1 ? 's are' : ' is'} not connected for{' '}
+                {unconnectedPlatforms
+                  .map((platform) => PLATFORMS.find((item) => item.id === platform)?.name ?? platform)
+                  .join(', ')}.
+                Connect {unconnectedPlatforms.length > 1 ? 'these accounts' : 'this account'} before scheduling.
+              </p>
+            )}
           </div>
 
           {/* Content */}
