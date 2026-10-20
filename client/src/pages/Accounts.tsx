@@ -18,10 +18,12 @@ const Accounts = () => {
         const label = platform ? platform.charAt(0).toUpperCase() + platform.slice(1) : 'Social Media';
         toast.loading(`Syncing ${label} account...`, { id: 'sync' });
         await API.get('/api/oauth/sync');
-        toast.success('Accounts synced', { id: 'sync' });
       }
       const { data } = await API.get('/api/accounts');
       setAccounts(data);
+      if (isSync) {
+        toast.success(successMessage || 'Accounts synced', { id: 'sync' });
+      }
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to load accounts');
     }
