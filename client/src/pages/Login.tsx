@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { MailIcon, LockIcon, ArrowRightIcon, User2Icon } from "lucide-react";
+import { SiGithub, SiGoogle } from "@icons-pack/react-simple-icons";
 import { useAuth } from "../context/authContext";
 import API from "../api/axios";
 import toast from "react-hot-toast";
@@ -104,16 +105,17 @@ export default function Login() {
                     </div>
                     <div className="grid grid-cols-1 gap-2">
                         {[
-                            ["google", "Google"],
-                            ["github", "GitHub"],
-                        ].map(([provider, label]) => (
+                            { provider: "google", label: "Google", Icon: SiGoogle },
+                            { provider: "github", label: "GitHub", Icon: SiGithub },
+                        ].map(({ provider, label, Icon }) => (
                             <button
                                 key={provider}
                                 type="button"
                                 disabled={oauthLoading !== null}
                                 onClick={() => handleOAuth(provider)}
-                                className="w-full rounded-full border border-slate-200 py-2.5 text-sm text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
+                                className="flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 py-2.5 text-sm text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
                             >
+                                <Icon className="size-4" aria-hidden="true" />
                                 {oauthLoading === provider ? `Connecting to ${label}...` : `Continue with ${label}`}
                             </button>
                         ))}

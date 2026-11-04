@@ -86,8 +86,8 @@ A full-stack social media scheduling app with AI-assisted post writing, account 
    JWT_SECRET=<use-a-long-random-secret>
    GEMINI_API_KEY=<your-gemini-api-key>
    ZERNIO_API_KEY=<your-zernio-api-key>
-   CLIENT_URL=http://localhost:5173
-   OAUTH_SERVER_URL=http://localhost:3000
+   CLIENT_URL=frontend_uri
+   OAUTH_SERVER_URL=backend_uri
    GOOGLE_CLIENT_ID=<your-google-oauth-client-id>
    GOOGLE_CLIENT_SECRET=<your-google-oauth-client-secret>
    GITHUB_CLIENT_ID=<your-github-oauth-client-id>
@@ -96,8 +96,8 @@ A full-stack social media scheduling app with AI-assisted post writing, account 
 
    OAuth credentials are required only if you want to enable sign-in with that provider. Register these callback URLs in the corresponding provider console:
 
-   - Google: `http://localhost:3000/api/auth/oauth/google/callback`
-   - GitHub: `http://localhost:3000/api/auth/oauth/github/callback`
+   - Google: `backend_uri/api/auth/oauth/google/callback`
+   - GitHub: `backend_uri/api/auth/oauth/github/callback`
 
    Use the deployed backend URL for `OAUTH_SERVER_URL` and the deployed frontend origin for `CLIENT_URL` in production. Register the matching deployed callback URLs with each provider as well. Google must return a verified email; GitHub requires the `user:email` scope and a verified address.
 
@@ -153,7 +153,7 @@ Run commands from the relevant folder.
 Create a **Web Service** connected to this repository:
 
 - **Root Directory:** `server`
-- **Build Command:** `npm install && npm run build`
+- **Build Command:** `npm install --include=dev && npm run build`
 - **Start Command:** `node dist/server.js`
 
 Set these environment variables in Render:
@@ -168,6 +168,7 @@ Set these environment variables in Render:
 - Provider credentials: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`, and `GITHUB_CLIENT_SECRET`.
 
 Render provides `PORT` for the web service. The app uses it automatically.
+The build command explicitly includes development dependencies because TypeScript and the `@types/*` packages are needed to compile the server, even when `NODE_ENV=production`.
 
 The server runs a cron scheduler for publishing scheduled posts. Use an always-on service plan; a service that sleeps may not execute scheduled publishing reliably.
 
