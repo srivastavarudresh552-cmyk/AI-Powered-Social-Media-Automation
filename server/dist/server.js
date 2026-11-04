@@ -23,6 +23,7 @@ app.use("/api/oauth", socialAuthRouter);
 app.use("/api/accounts", accountRouter);
 app.use("/api/posts", postRouter);
 app.use("/api/activity", activityRouter);
+// Initialise Scheduler
 initScheduler();
 // Global error handler
 app.use((err, _req, res, _next) => {

@@ -1,4 +1,4 @@
-import { createContext, createElement, useContext, useEffect, useState } from "react";
+import { createContext, createElement, useCallback, useContext, useEffect, useState } from "react";
 import API from "../api/axios";
 
 interface User {
@@ -44,19 +44,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     }, [token]);
 
-    const login = (userData: User, newToken: string) => {
+    const login = useCallback((userData: User, newToken: string) => {
         setUser(userData);
         setToken(newToken);
         localStorage.setItem('user', JSON.stringify(userData));
         localStorage.setItem('token', newToken);
-    };
+    }, []);
 
-    const logout = () => {
+    const logout = useCallback(() => {
         setUser(null);
         setToken(null);
         localStorage.removeItem('user');
         localStorage.removeItem('token');
-    };
+    }, []);
 
     return createElement(
         AuthContext.Provider,

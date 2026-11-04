@@ -86,7 +86,20 @@ A full-stack social media scheduling app with AI-assisted post writing, account 
    JWT_SECRET=<use-a-long-random-secret>
    GEMINI_API_KEY=<your-gemini-api-key>
    ZERNIO_API_KEY=<your-zernio-api-key>
+   CLIENT_URL=http://localhost:5173
+   OAUTH_SERVER_URL=http://localhost:3000
+   GOOGLE_CLIENT_ID=<your-google-oauth-client-id>
+   GOOGLE_CLIENT_SECRET=<your-google-oauth-client-secret>
+   GITHUB_CLIENT_ID=<your-github-oauth-client-id>
+   GITHUB_CLIENT_SECRET=<your-github-oauth-client-secret>
    ```
+
+   OAuth credentials are required only if you want to enable sign-in with that provider. Register these callback URLs in the corresponding provider console:
+
+   - Google: `http://localhost:3000/api/auth/oauth/google/callback`
+   - GitHub: `http://localhost:3000/api/auth/oauth/github/callback`
+
+   Use the deployed backend URL for `OAUTH_SERVER_URL` and the deployed frontend origin for `CLIENT_URL` in production. Register the matching deployed callback URLs with each provider as well. Google must return a verified email; GitHub requires the `user:email` scope and a verified address.
 
 3. Start the backend in one terminal:
 
@@ -149,6 +162,10 @@ Set these environment variables in Render:
 - `JWT_SECRET`
 - `GEMINI_API_KEY`
 - `ZERNIO_API_KEY`
+- `OAUTH_SERVER_URL` (for example, `https://<your-render-service>.onrender.com`)
+- `CLIENT_URL` (your deployed frontend origin)
+- `NODE_ENV=production` (ensures the OAuth state cookie is marked secure)
+- Provider credentials: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`, and `GITHUB_CLIENT_SECRET`.
 
 Render provides `PORT` for the web service. The app uses it automatically.
 
@@ -163,17 +180,18 @@ Import the repository as a Vercel project:
 - **Build Command:** `npm run build`
 - **Output Directory:** `dist`
 
-Set the Vercel environment variable:
+Set this Vercel environment variable to the Render API's base URL (no trailing slash):
 
 ```env
 VITE_API_BASE_URL=https://<your-render-service>.onrender.com
 ```
 
-Redeploy after setting environment variables. If directly refreshing client-side routes returns a 404, configure a Vercel rewrite to serve `index.html` for application routes.
+The `client/vercel.json` rewrite serves the SPA for application routes, including `/auth/callback`. Redeploy after setting the environment variable.
 
-### OAuth, CORS, and database access
+### Social-account OAuth, user sign-in, CORS, and database access
 
 - The OAuth return URL is currently constructed from the browser request's `Origin` and returns to `/accounts`. Configure Zernio and the connected social providers to accept your deployed Vercel domain and the corresponding OAuth flow.
+- User sign-in supports Google and GitHub. Set `CLIENT_URL` to the canonical deployed Vercel origin (for example, `https://your-app.vercel.app`) and `OAUTH_SERVER_URL` to the Render service origin. In Google and GitHub provider settings, register these exact callback URLs: `<OAUTH_SERVER_URL>/api/auth/oauth/google/callback` and `<OAUTH_SERVER_URL>/api/auth/oauth/github/callback`. These provider callbacks go to Render; after login, the backend redirects to Vercel's `/auth/callback`. A provider-verified email matching an existing user account links that provider to the account.
 - The API currently enables CORS for all origins. Before production use, restrict it to the deployed frontend origin.
 - Configure MongoDB Atlas Network Access to allow connections from the deployed Render service. Prefer allowing the service's outbound IP addresses where available instead of allowing access from everywhere.
 
