@@ -153,7 +153,7 @@ Run commands from the relevant folder.
 Create a **Web Service** connected to this repository:
 
 - **Root Directory:** `server`
-- **Build Command:** `npm install && npm run build`
+- **Build Command:** `npm install --include=dev && npm run build`
 - **Start Command:** `node dist/server.js`
 
 Set these environment variables in Render:
@@ -168,6 +168,7 @@ Set these environment variables in Render:
 - Provider credentials: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GITHUB_CLIENT_ID`, and `GITHUB_CLIENT_SECRET`.
 
 Render provides `PORT` for the web service. The app uses it automatically.
+The build command explicitly includes development dependencies because TypeScript and the `@types/*` packages are needed to compile the server, even when `NODE_ENV=production`.
 
 The server runs a cron scheduler for publishing scheduled posts. Use an always-on service plan; a service that sleeps may not execute scheduled publishing reliably.
 
