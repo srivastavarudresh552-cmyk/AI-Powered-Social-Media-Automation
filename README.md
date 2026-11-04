@@ -86,8 +86,8 @@ A full-stack social media scheduling app with AI-assisted post writing, account 
    JWT_SECRET=<use-a-long-random-secret>
    GEMINI_API_KEY=<your-gemini-api-key>
    ZERNIO_API_KEY=<your-zernio-api-key>
-   CLIENT_URL=http://localhost:5173
-   OAUTH_SERVER_URL=http://localhost:3000
+   CLIENT_URL=frontend_uri
+   OAUTH_SERVER_URL=backend_uri
    GOOGLE_CLIENT_ID=<your-google-oauth-client-id>
    GOOGLE_CLIENT_SECRET=<your-google-oauth-client-secret>
    GITHUB_CLIENT_ID=<your-github-oauth-client-id>
@@ -96,8 +96,8 @@ A full-stack social media scheduling app with AI-assisted post writing, account 
 
    OAuth credentials are required only if you want to enable sign-in with that provider. Register these callback URLs in the corresponding provider console:
 
-   - Google: `http://localhost:3000/api/auth/oauth/google/callback`
-   - GitHub: `http://localhost:3000/api/auth/oauth/github/callback`
+   - Google: `backend_uri/api/auth/oauth/google/callback`
+   - GitHub: `backend_uri/api/auth/oauth/github/callback`
 
    Use the deployed backend URL for `OAUTH_SERVER_URL` and the deployed frontend origin for `CLIENT_URL` in production. Register the matching deployed callback URLs with each provider as well. Google must return a verified email; GitHub requires the `user:email` scope and a verified address.
 
