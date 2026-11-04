@@ -7,6 +7,7 @@ import Accounts from "./pages/Accounts";
 import AIComposer from "./pages/AIComposer";
 import Scheduler from "./pages/Scheduler";
 import { Toaster } from "react-hot-toast";
+import OAuthCallback from "./pages/OAuthCallback";
 
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
             <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/auth/callback" element={<OAuthCallback />} />
                 <Route element = {<Layout/>}>
                     <Route path="/dashboard" element={<Dashboard/>} />
                     <Route path="/accounts" element={<Accounts/>} />

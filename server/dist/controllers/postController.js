@@ -1,39 +1,72 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
+import axios from "axios";
+import { createReadStream } from "node:fs";
+import { unlink } from "node:fs/promises";
+import zernio from "../config/zernio.js";
 import Generation from "../models/Generation.js";
 import Post from "../models/Post.js";
+import { Account } from "../models/Accounts.js";
+const supportedMediaTypes = [
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+    "video/mp4",
+    "video/mpeg",
+    "video/quicktime",
+    "video/avi",
+    "video/x-msvideo",
+    "video/webm",
+    "video/x-m4v",
+];
 // Generate post
 // POST /api/posts/generate
 export const generatePost = async (req, res) => {
     try {
-        const { prompt, tone, generateImage } = req.body;
+        const { prompt, tone } = req.body;
+        if (typeof prompt !== "string" || !prompt.trim()) {
+            res.status(400).json({ message: "Please provide a prompt to generate a post." });
+            return;
+        }
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
             res.status(400).json({ message: "Gemini API Key is missing. Please add it to your server/.env file." });
             return;
         }
         const ai = new GoogleGenAI({ apiKey });
-        // Generate Text
-        const textResponse = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: `Generate a social media post based on this prompt: "${prompt}".
-Style: ${tone}.
-Include relevant hashtags.
-Format the response as JSON with "content" and "imagePrompt" fields.
-The "imagePrompt" should be a highly descriptive prompt for an image generator
-that complements the post.`,
-        });
-        let content = "";
-        let imagePrompt = prompt;
-        try {
-            const rawText = textResponse.text || "";
-            const jsonMatch = rawText.match(/\{\{[\s\S]*\}\}/);
-            const data = jsonMatch ? JSON.parse(jsonMatch[0]) : { content: rawText, imagePrompt: prompt };
-            content = data.content;
-            imagePrompt = data.imagePrompt;
+        const interaction = await ai.interactions.create({
+            model: "gemini-3.1-flash-lite",
+            input: `Write a concise social media post for this idea: "${prompt.trim()}".
+Tone: ${tone}. Include relevant hashtags. Return JSON with one string field, "content".`,
+            response_format: {
+                type: "text",
+                mime_type: "application/json",
+                schema: {
+                    type: "object",
+                    properties: { content: { type: "string" } },
+                    required: ["content"],
+                    additionalProperties: false,
+                },
+            },
+            generation_config: {
+                max_output_tokens: 256,
+                thinking_level: ThinkingLevel.LOW.toLowerCase(),
+            },
+        }, { timeout: 12000, maxRetries: 0 });
+        const rawText = interaction.output_text?.trim();
+        if (!rawText) {
+            throw new Error("Gemini returned an empty response.");
         }
-        catch (e) {
-            content = textResponse.text || "";
+        const jsonText = rawText
+            .replace(/^```(?:json)?\s*/i, "")
+            .replace(/\s*```$/, "")
+            .trim();
+        const result = JSON.parse(jsonText);
+        if (typeof result.content !== "string" || !result.content.trim()) {
+            throw new Error("Gemini returned a response without post content.");
         }
+        const content = result.content.trim();
         // let mediaURL = "";
         // 5:40:00 -- for image
         // if(generateImage) { // code depends on AI image generator
@@ -59,6 +92,20 @@ that complements the post.`,
         res.json(generation);
     }
     catch (error) {
+        if (error?.status === 503 ||
+            error?.code === "UNAVAILABLE" ||
+            (error instanceof Error && /high demand|temporarily unavailable|overloaded/i.test(error.message))) {
+            res.status(503).json({
+                message: "Gemini is temporarily overloaded. Please wait a little and try generating again.",
+            });
+            return;
+        }
+        if (error?.status === 504 ||
+            error?.code === "DEADLINE_EXCEEDED" ||
+            (error instanceof Error && /timeout|deadline exceeded|deadline expired/i.test(error.message))) {
+            res.status(504).json({ message: "Gemini took too long to generate this post. Please try again." });
+            return;
+        }
         res.status(500).json({ message: error?.message || "Server error" });
     }
     // 5:57:00
@@ -100,32 +147,58 @@ export const schedulePosts = async (req, res) => {
                 parsedPlatform = platforms.split(",");
             }
         }
-        // let mediaUrl: string | undefined = req.body.mediaUrl;
-        // let mediaType: "image" | "video" | undefined = req.body.mediaType;
-        // Upload media only if a file is provided.
-        // if (req.file) {
-        //     const result = await new Promise<any>((resolve, reject) => {
-        //         const stream = cloudinary.uploader.upload_stream(
-        //             {
-        //                 resource_type: "auto",
-        //                 folder: "social-scheduler",
-        //             },
-        //             (error, result) => {
-        //                 if (error) reject(error);
-        //                 else resolve(result);
-        //             }
-        //         );
-        //         stream.end(req.file!.buffer);
-        //     });
-        //     mediaUrl = result.secure_url;
-        //     mediaType = result.resource_type === "video" ? "video" : "image";
-        // }
+        if (!Array.isArray(parsedPlatform) || parsedPlatform.length === 0) {
+            res.status(400).json({ message: "Select at least one platform." });
+            return;
+        }
+        const connectedAccounts = await Account.find({
+            user: req.user._id,
+            platform: { $in: parsedPlatform },
+            status: "connected",
+            zernioAccountId: { $exists: true, $ne: "" },
+        }).select("platform");
+        const connectedPlatforms = new Set(connectedAccounts.map((account) => account.platform));
+        const unconnectedPlatforms = parsedPlatform.filter((platform) => typeof platform === "string" && !connectedPlatforms.has(platform));
+        if (unconnectedPlatforms.length > 0) {
+            res.status(400).json({
+                message: `Your account${unconnectedPlatforms.length > 1 ? "s are" : " is"} not connected: ${unconnectedPlatforms.join(", ")}. Connect ${unconnectedPlatforms.length > 1 ? "them" : "it"} before scheduling.`,
+            });
+            return;
+        }
+        let mediaURL;
+        let mediaType;
+        if (req.file) {
+            const contentType = supportedMediaTypes.find((type) => type === req.file.mimetype);
+            if (!contentType) {
+                res.status(400).json({ message: "Unsupported image or video format" });
+                return;
+            }
+            const { data: upload } = await zernio.media.getMediaPresignedUrl({
+                body: {
+                    filename: req.file.originalname,
+                    contentType,
+                    size: req.file.size,
+                },
+            });
+            if (!upload.uploadUrl || !upload.publicUrl) {
+                throw new Error("Zernio did not return media upload URLs");
+            }
+            await axios.put(upload.uploadUrl, createReadStream(req.file.path), {
+                headers: {
+                    "Content-Type": contentType,
+                    "Content-Length": req.file.size,
+                },
+                maxBodyLength: Infinity,
+                maxContentLength: Infinity,
+            });
+            mediaURL = upload.publicUrl;
+            mediaType = contentType.startsWith("video/") ? "video" : "image";
+        }
         const post = await Post.create({
             user: req.user._id,
             content,
             platforms: parsedPlatform,
-            // ...(mediaUrl ? { mediaUrl } : {}),
-            // ...(mediaType ? { mediaType } : {}),
+            ...(mediaURL ? { mediaURL, mediaType } : {}),
             scheduledFor,
             status,
         });
@@ -133,5 +206,15 @@ export const schedulePosts = async (req, res) => {
     }
     catch (error) {
         res.status(500).json({ message: error?.message || "Server Error" });
+    }
+    finally {
+        if (req.file) {
+            try {
+                await unlink(req.file.path);
+            }
+            catch (error) {
+                console.error("Failed to remove temporary media upload", error);
+            }
+        }
     }
 };

@@ -3,8 +3,12 @@ import { User } from "../models/user.js";
 import  bcrypt  from "bcrypt";
 import jwt from 'jsonwebtoken'
 
-const  generateToken = (id: string) => {
-    return jwt.sign({id}, process.env.JWT_SECRET || "fallback_secret")
+export const generateToken = (id: string) => {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+        throw new Error("JWT_SECRET is not configured");
+    }
+    return jwt.sign({id}, secret)
 
 }
 
@@ -40,8 +44,8 @@ export const registerUser = async (req:Request, res: Response):Promise<void> => 
 export const loginUser = async (req:Request, res: Response):Promise<void> => {
     try {
         const {email,password} = req.body;
-        const user = await User.findOne({email})
-        if(user && (await bcrypt.compare(password, user.password))){
+        const user = await User.findOne({email}).select("+password")
+        if(user?.password && (await bcrypt.compare(password, user.password))){
             res.json({_id: user._id, name: user.name, email:user.email, token: generateToken(user._id.toString())});
         }else{
             res.status(401).json({message: "Invalid Email or Password"})

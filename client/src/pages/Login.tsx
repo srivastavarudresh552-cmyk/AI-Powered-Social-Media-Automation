@@ -11,8 +11,15 @@ export default function Login() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
+    const [oauthLoading, setOauthLoading] = useState<string | null>(null);
     const navigate = useNavigate();
     const {login, user} = useAuth();
+
+    const handleOAuth = (provider: string) => {
+        setOauthLoading(provider);
+        const apiBaseUrl = (API.defaults.baseURL || window.location.origin).replace(/\/+$/, "");
+        window.location.assign(`${apiBaseUrl}/api/auth/oauth/${provider}`);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -32,7 +39,16 @@ export default function Login() {
 
     useEffect(() => {
         if(user) navigate('/dashboard')
-    },[user])
+    },[user, navigate])
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const error = params.get("oauth_error");
+        if (error) {
+            toast.error(error);
+            navigate("/login", { replace: true });
+        }
+    }, [navigate]);
 
     return (
         <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
@@ -80,6 +96,28 @@ export default function Login() {
                             )}
                         </button>
                     </form>
+
+                    <div className="my-6 flex items-center gap-3 text-xs text-slate-400">
+                        <div className="h-px flex-1 bg-slate-200" />
+                        OR CONTINUE WITH
+                        <div className="h-px flex-1 bg-slate-200" />
+                    </div>
+                    <div className="grid grid-cols-1 gap-2">
+                        {[
+                            ["google", "Google"],
+                            ["github", "GitHub"],
+                        ].map(([provider, label]) => (
+                            <button
+                                key={provider}
+                                type="button"
+                                disabled={oauthLoading !== null}
+                                onClick={() => handleOAuth(provider)}
+                                className="w-full rounded-full border border-slate-200 py-2.5 text-sm text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
+                            >
+                                {oauthLoading === provider ? `Connecting to ${label}...` : `Continue with ${label}`}
+                            </button>
+                        ))}
+                    </div>
 
                     <div className="mt-6 text-center text-sm text-slate-500">
                         {loginState ? (
